@@ -96,7 +96,37 @@ class CameraIntrinsics:
         # ]
         baseline = 0.07090622931718826
         return height, width, p, baseline
+    def getIntrinsics640_480(self):
+        height = 480
+        width = 640
+        [fx, fy, cx, cy, baseline] = [252.562, 252.562, 309.352, 147.295, 70.0427]
 
+        p = [
+            fx, 0.0, cx, 33.82135389646828,
+            0.0, fy, cy, 0.0,
+            0.0, 0.0, 1.0, 0.0
+        ]
+        # 矫正后
+        fx = 229.98088073730466
+        fy = 229.98088073730466
+        cx = 329.4670867919922
+        cy = 206.48446655273438
+        fx = 229.98088073730466
+        fy = 229.98088073730466
+        cx = 318.0451965332031
+        cy = 206.48446655273438
+        p = [
+            fx, 0.0, cx, 33.82135389646828,
+            0.0, fy, cy, 0.0,
+            0.0, 0.0, 1.0, 0.0
+        ]
+        # p = [
+        #     460.3950380000503, 0.0, 620.1596069335938, 33.82135389646828,
+        #     0.0, 460.3950380000503, 267.4479331970215, 0.0,
+        #     0.0, 0.0, 1.0, 0.0
+        # ]
+        baseline = 0.0700427
+        return height, width, p, baseline
     def getIntrinsics640_352(self):
         height = 352
         width = 640
@@ -288,4 +318,3 @@ class Stereo:
 if __name__ == '__main__':
     CameraIntrinsics = Stereo()
     # print(CameraIntrinsics.getIntrinsics1280_640())
-    

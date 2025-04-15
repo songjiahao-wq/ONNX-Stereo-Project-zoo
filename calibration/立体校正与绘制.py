@@ -161,7 +161,7 @@ if flag == 1:
     img_left = cv2.resize(img_left, (img_left.shape[1]//2, img_left.shape[0]//2))
     img_right = cv2.resize(img_right, (img_right.shape[1]//2, img_right.shape[0]//2))
 elif flag == 2:
-    video_path = r"rectified_video.avi"
+    video_path = r"data/rectified_video.avi"
     # video_path = r"D:\BaiduSyncdisk\work\Stereo\data\stereo_video_20250325_170318.avi"
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()

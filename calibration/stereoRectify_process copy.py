@@ -386,7 +386,7 @@ if __name__ == "__main__":
         
         # 保存为ffv1视频
         fourcc = cv2.VideoWriter_fourcc(*'FFV1')
-        out = cv2.VideoWriter('rectified_video.avi', fourcc, 30.0, (1056, 784 * 2))
+        out = cv2.VideoWriter('data/rectified_video.avi', fourcc, 30.0, (1056, 784 * 2))
         while True:
             ret_left, frame_left = cap_left.read()
             ret_right, frame_right = cap_right.read()

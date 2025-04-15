@@ -155,13 +155,13 @@ if __name__ == '__main__':
     use_onnx = False
     if use_onnx:
         # Initialize model
-        model_path = './weights/model_float32_opt.onnx'
+        model_path = '../HITStereo/weights/model_float32_opt.onnx'
         depth_estimator = HITStereo_ONNX(model_path)
     else:
         # Initialize model
         # model_path = './weights/model_float32_optfp16.engine'
         # model_path = './weights/model_float32_optfp32.engine'
-        model_path = './weights/hitnet_xl_sf_finalpass_from_tf_480x640fp16.engine'
+        model_path = 'weights/hitnet_xl_sf_finalpass_from_tf_480x640fp16.engine'
         # model_path = './weights/model_float32fp32.engine'
         depth_estimator = HITStereo_TRT(model_path)
     # Load images

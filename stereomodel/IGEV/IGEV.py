@@ -22,11 +22,18 @@ class IGEVStereo_ONNX(BaseONNXInference):
 
     def __call__(self, left_img, right_img):
         return self.update(left_img, right_img)
+    def get_input_details(self):
 
+        model_inputs = self.session.get_inputs()
+        self.input_names = [model_inputs[i].name for i in range(len(model_inputs))]
+
+        self.input_shape = model_inputs[-1].shape
+        self.input_height = self.input_shape[2]
+        self.input_width = self.input_shape[3]
 
     def prepare_input(self, img, half=False):
         img_input = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # img_input = cv2.resize(img, (self.input_width, self.input_height), cv2.INTER_AREA)
+        img_input = cv2.resize(img, (self.input_width, self.input_height), cv2.INTER_AREA)
 
         img_input = img_input.transpose(2, 0, 1)
         img_input = img_input[np.newaxis, :, :, :]
@@ -67,10 +74,10 @@ if __name__ == '__main__':
     from config import Stereo
 
     Stereo = Stereo(res_height=480, res_width=640)
-    use_onnx = False
+    use_onnx = True
     if use_onnx:
         # Initialize model
-        model_path = './weights/igev_sceneflow_HxW.onnx'
+        model_path = './weights/IGEV_middlebury_HxW.onnx'
         depth_estimator = IGEVStereo_ONNX(model_path)
     else:
         # Initialize model
@@ -109,4 +116,4 @@ if __name__ == '__main__':
         color_disparity = depth_estimator.draw_disparity()
         combined_img = np.hstack((rectifyed_left, color_disparity))
         cv2.imshow("Estimated disparity", combined_img)
-        cv2.waitKey(0)
+        cv2.waitKey(0)

@@ -167,7 +167,7 @@ class trt_infer_time:
 
 
 # 运行速度测量函数
-trt_infer_time_instance = trt_infer_time(engine_file_path=r'stereomodel/HITStereo/weights/model_float32fp16.engine')
+trt_infer_time_instance = trt_infer_time(engine_file_path=r'stereomodel\IGEV\weights\IGEV_middlebury_HxWfp16.engine')
 trt_infer_time_instance.measure_speed()
 # measure_speed(engine_file=r"D:\BaiduSyncdisk\work\RTMpose-26-port\rtmpose-mobilev4\combined_model2.engine")
 # measure_speed(engine_file='./weights/end2end.engine')

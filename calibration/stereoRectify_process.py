@@ -9,6 +9,8 @@ import numpy as np
 import json
 import glob
 import os
+import matplotlib.pyplot as plt
+np.set_printoptions(suppress=True)
 
 class stereoRectify:
     def __init__(self, findChessboardCorners=False):
@@ -21,11 +23,14 @@ class stereoRectify:
         self.square_size = 0.0914  # æ¯ä¸ªæ–¹æ ¼çš„å°ºå¯¸
 
         # ä¸–ç•Œåæ ‡ç³»ä¸‹çš„è§’ç‚¹åæ ‡
-        self.world_points = np.array([[x * self.square_size, y * self.square_size, 0] for y in range(self.board_size[1]) for x in range(self.board_size[0])], dtype=np.float32)
+        # self.world_points = np.array([[x * self.square_size, y * self.square_size, 0] for y in range(self.board_size[1]) for x in range(self.board_size[0])], dtype=np.float32)
+        self.world_points = np.zeros((self.board_size[0] * self.board_size[1], 3), dtype=np.float32)
+        self.world_points[:, :2] = np.mgrid[0:self.board_size[0], 0:self.board_size[1]].T.reshape(-1, 2) * self.square_size
+        # print("World points (å‰5ä¸ªç‚¹):\n", self.world_points[:5])
     # è¾“å…¥: å·¦å³ç›¸æœºæ‹æ‘„çš„æ£‹ç›˜æ ¼å›¾åƒï¼ˆæˆ–åœ†ç‚¹æ ‡å®šæ¿ï¼‰
     # è¾“å‡º: ç›¸æœºå†…å‚ï¼ˆK_left, K_rightï¼‰ã€ç•¸å˜ç³»æ•°ï¼ˆdist_left, dist_rightï¼‰ã€å¤–å‚ï¼ˆR, Tï¼‰
 
-    def stereo_calibrate(self, left_images, right_images):
+    def stereo_calibrate_image(self, left_images, right_images):
         # 1. åˆå§‹åŒ–æ ‡å®šæ¿è§’ç‚¹åæ ‡ï¼ˆä¸–ç•Œåæ ‡ç³»ï¼‰
         obj_points = []  # 3Dç‚¹ï¼ˆæ£‹ç›˜æ ¼è§’ç‚¹çš„ç‰©ç†åæ ‡ï¼‰
         left_img_points = []  # å·¦å›¾åƒ2Dç‚¹
@@ -80,27 +85,169 @@ class stereoRectify:
             right_img_points,  # å³å›¾åƒçš„è§’ç‚¹
             K_left, dist_left,  # å·¦ç›¸æœºå†…å‚å’Œç•¸å˜ç³»æ•°
             K_right, dist_right,  # å³ç›¸æœºå†…å‚å’Œç•¸å˜ç³»æ•°
-            gray_left.shape[::-1],  # å›¾åƒå°ºå¯¸
-            # criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)  # ç²¾åº¦å’Œæœ€å¤§è¿­ä»£æ¬¡æ•°
+            self.image_size,  # å›¾åƒå°ºå¯¸
+            criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)  # ç²¾åº¦å’Œæœ€å¤§è¿­ä»£æ¬¡æ•°
         )
         print(K_left, K_left_est)
         print(K_right, K_right_est)
         print(dist_left, dist_left_est)
         print(dist_right, dist_right_est)
-        left_reprojection_error = self.compute_reprojection_error(obj_points, left_img_points, rvecs_left, tvecs_left, K_left_est, dist_left_est)
-        right_reprojection_error = self.compute_reprojection_error(obj_points, right_img_points, rvecs_right, tvecs_right, K_right_est, dist_right_est)
+        left_reprojection_error, left_error_list = self.compute_reprojection_error(obj_points, left_img_points, rvecs_left, tvecs_left, K_left_est, dist_left_est)
+        right_reprojection_error, right_error_list = self.compute_reprojection_error(obj_points, right_img_points, rvecs_right, tvecs_right, K_right_est, dist_right_est)
         print("Left Reprojection Error: \n", left_reprojection_error)
         print("Right Reprojection Error: \n", right_reprojection_error)
-        
+        # # å¯è§†åŒ–å·¦å³è¯¯å·®åˆ—è¡¨åœ¨ä¸€å¼ å›¾é‡Œï¼Œæ¨ªåæ ‡ä¸ºå›¾åƒç´¢å¼•ï¼Œçºµåæ ‡ä¸ºè¯¯å·®ï¼Œæ¯ä¸ªç‚¹ç”¨ä¸€ä¸ªåœ†åœˆè¡¨ç¤º
+        # # è¾“å‡ºæœ€å¤§è¯¯å·®çš„å›¾åƒåç§°
+        # max_error_index = np.argmax(left_error_list)
+        # print("Max Error Image: \n", left_images[max_error_index])
+        # max_error_index = np.argmax(right_error_list)
+        # print("Max Error Image: \n", right_images[max_error_index])
+        # plt.figure(figsize=(10, 5))
+        # plt.subplot(1, 2, 1)
+        # plt.plot(left_error_list, 'o')
+        # plt.xlabel('Image Index')
+        # plt.ylabel('Reprojection Error')
+        # plt.title('Left Reprojection Error')
+        # plt.subplot(1, 2, 2)
+        # plt.plot(right_error_list, 'o')
+        # plt.xlabel('Image Index')
+        # plt.ylabel('Reprojection Error')
+        # plt.title('Right Reprojection Error')
+        # plt.show()
+
+
         # 5. è®¡ç®—æ ¡æ­£å˜æ¢çŸ©é˜µ
         _, _, _, _, Q = self.stereo_rectify_without_distortion(K_left_est, K_right_est, R, T, gray_left.shape[::-1])
-        # _, _, _, _, Q = self.stereo_rectify_with_distortion(K_left_est, dist_left_est, K_right_est, dist_right_est, R, T, gray_left.shape[::-1])
+        # _, _, _, _, Q = self.stereo_rectify_with_distortion(K_left_est, dist_left_est, K_right_est, dist_right_est, R, T,self.image_size)
         
         # æ‰“å°è®¡ç®—ç»“æœ
         print("Left Camera Intrinsics: \n", K_left_est)
         print("Left Camera Distortion Coefficients: \n", dist_left_est)
         print("Right Camera Intrinsics: \n", K_right_est)
         print("Right Camera Distortion Coefficients: \n", dist_right_est)
+        print("Rotation Matrix: \n", R)
+        print("Translation Vector: \n", T)
+        print("Essential Matrix: \n", E)
+        print("Fundamental Matrix: \n", F)
+        print("Q Matrix: \n", Q)
+        self.calculate_fx_fy_cx_cy_baseline(np.array(Q))
+        print("fx: \n", self.fx)
+        print("fy: \n", self.fy)
+        print("cx: \n", self.cx)
+        print("cy: \n", self.cy)
+        print("baseline: \n", self.baseline)
+        return K_left, dist_left, K_right, dist_right, R, T, Q
+
+
+    def stereo_calibrate_video(self, left_video_path, right_video_path, error_threshold=2.0):
+        # 1. åˆå§‹åŒ–æ ‡å®šæ¿è§’ç‚¹åæ ‡ï¼ˆä¸–ç•Œåæ ‡ç³»ï¼‰
+        obj_points = []  # 3Dç‚¹ï¼ˆæ£‹ç›˜æ ¼è§’ç‚¹çš„ç‰©ç†åæ ‡ï¼‰
+        left_img_points = []  # å·¦å›¾åƒ2Dç‚¹
+        right_img_points = []  # å³å›¾åƒ2Dç‚¹
+        detect_count = 0
+        cap_left = cv2.VideoCapture(left_video_path)
+        cap_right = cv2.VideoCapture(right_video_path)
+        # 2. æ£€æµ‹æ£‹ç›˜æ ¼è§’ç‚¹
+        frame_count = 0
+        while True:
+            ret_left, frame_left = cap_left.read()
+            ret_right, frame_right = cap_right.read()
+            if not ret_left or not ret_right:
+                break
+            frame_count += 1
+            if frame_count % 20 == 0:
+                gray_left = cv2.cvtColor(frame_left, cv2.COLOR_BGR2GRAY)
+                gray_right = cv2.cvtColor(frame_right, cv2.COLOR_BGR2GRAY)
+                flags = (cv2.CALIB_CB_SYMMETRIC_GRID) 
+                #  cv2.CALIB_CB_CLUSTERING )  # å¯ç”¨èšç±»ä¼˜åŒ–
+                #  cv2.CALIB_CB_ASYMMETRIC_GRID)  # é€‚åº”éå¯¹ç§°æ’åˆ—
+                ret_left, corners_left = cv2.findCirclesGrid(gray_left, self.board_size, None) 
+                ret_right, corners_right = cv2.findCirclesGrid(gray_right, self.board_size, None)
+                remove_index_left = [4, 5, 8, 13, 14, 18, 20]
+                remove_index_right = [3, 4, 8, 13, 14, 18, 20, 23]
+                if ret_left and ret_right:
+                    if detect_count in remove_index_left or detect_count in remove_index_right:
+                        detect_count += 1
+                        continue
+                    
+                    detect_count += 1
+                    print("detect_count: ", detect_count)
+
+                    obj_points.append(self.world_points)  # 3Dç‚¹
+                    left_img_points.append(corners_left)  # å·¦å›¾åƒ2Dç‚¹
+                    right_img_points.append(corners_right)  # å³å›¾åƒ2Dç‚¹
+                    
+                    # å¯è§†åŒ–è§’ç‚¹
+                    cv2.drawChessboardCorners(frame_left, self.board_size, corners_left, ret_left)
+                    cv2.drawChessboardCorners(frame_right, self.board_size, corners_right, ret_right)
+                    combined_img = cv2.resize(np.hstack((frame_left, frame_right)), (1280, 720))
+                    cv2.imshow('Left Image', combined_img)
+                    cv2.waitKey(1)
+                else:
+                    print('false')
+        cv2.destroyAllWindows()
+        # 3. å•ç›®æ ‡å®šï¼ˆè®¡ç®—å†…å‚å’Œç•¸å˜ç³»æ•°ï¼‰
+        ret_left, K_left, dist_left, rvecs_left, tvecs_left = cv2.calibrateCamera(
+            obj_points, left_img_points, gray_left.shape[::-1], None, None#, flags=cv2.CALIB_USE_INTRINSIC_GUESS
+        )
+        ret_right, K_right, dist_right, rvecs_right, tvecs_right = cv2.calibrateCamera(
+            obj_points, right_img_points, gray_right.shape[::-1], None, None
+        )
+        # OmtxL, roiL = cv2.getOptimalNewCameraMatrix(K_left, dist_left, self.image_size, alpha=0, newImgSize=self.image_size)
+        # OmtxR, roiR = cv2.getOptimalNewCameraMatrix(K_right, dist_right,  self.image_size, alpha=0, newImgSize=self.image_size)
+        # 4. åŒç›®æ ‡å®šï¼ˆè®¡ç®—æ—‹è½¬çŸ©é˜µ R å’Œå¹³ç§»å‘é‡ Tï¼‰
+        ret, _, _, _, _, R, T, E, F = cv2.stereoCalibrate(
+            obj_points,  # ä¸–ç•Œåæ ‡ç‚¹
+            left_img_points,  # å·¦å›¾åƒçš„è§’ç‚¹
+            right_img_points,  # å³å›¾åƒçš„è§’ç‚¹
+            K_left, dist_left,  # å·¦ç›¸æœºå†…å‚å’Œç•¸å˜ç³»æ•°
+            K_right, dist_right,  # å³ç›¸æœºå†…å‚å’Œç•¸å˜ç³»æ•°
+            self.image_size,  # å›¾åƒå°ºå¯¸
+            # criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)  # ç²¾åº¦å’Œæœ€å¤§è¿­ä»£æ¬¡æ•°
+        )
+        left_reprojection_error, left_error_list = self.compute_reprojection_error(obj_points, left_img_points, rvecs_left, tvecs_left, K_left, dist_left)
+        right_reprojection_error, right_error_list = self.compute_reprojection_error(obj_points, right_img_points, rvecs_right, tvecs_right, K_right, dist_right)
+        print("Left Reprojection Error: \n", left_reprojection_error)
+        print("Right Reprojection Error: \n", right_reprojection_error)
+        # å¯è§†åŒ–å·¦å³è¯¯å·®åˆ—è¡¨åœ¨ä¸€å¼ å›¾é‡Œï¼Œæ¨ªåæ ‡ä¸ºå›¾åƒç´¢å¼•ï¼Œçºµåæ ‡ä¸ºè¯¯å·®ï¼Œæ¯ä¸ªç‚¹ç”¨ä¸€ä¸ªåœ†åœˆè¡¨ç¤º
+        # è¾“å‡ºæœ€å¤§è¯¯å·®çš„å›¾åƒåç§°
+        max_error_index = np.argmax(left_error_list)
+        print("Max Error Image left: \n", max_error_index)
+        max_error_index = np.argmax(right_error_list)
+        print("Max Error Image right: \n", max_error_index)
+        # è¾“å‡ºè¯¯å·®å¤§äº2çš„index
+        left_error_index = []
+        right_error_index = []
+        for i in range(len(left_error_list)):
+            if left_error_list[i] > 2:
+                left_error_index.append(i)
+            if right_error_list[i] > 2:
+                right_error_index.append(i)
+        print("Left Error Index: \n", left_error_index)
+        print("Right Error Index: \n", right_error_index)
+        # plt.figure(figsize=(10, 5))
+        # plt.subplot(1, 2, 1)
+        # plt.plot(left_error_list, 'o')
+        # plt.xlabel('Image Index')
+        # plt.ylabel('Reprojection Error')
+        # plt.title('Left Reprojection Error')
+        # plt.subplot(1, 2, 2)
+        # plt.plot(right_error_list, 'o')
+        # plt.xlabel('Image Index')
+        # plt.ylabel('Reprojection Error')
+        # plt.title('Right Reprojection Error')
+        # plt.show()
+
+
+        # 5. è®¡ç®—æ ¡æ­£å˜æ¢çŸ©é˜µ
+        # _, _, _, _, Q = self.stereo_rectify_without_distortion(K_left, K_right, R, T, self.image_size)
+        _, _, _, _, Q = self.stereo_rectify_with_distortion(K_left, dist_left, K_right, dist_right, R, T,self.image_size)
+        
+        # æ‰“å°è®¡ç®—ç»“æœ
+        print("Left Camera Intrinsics: \n", K_left)
+        print("Left Camera Distortion Coefficients: \n", dist_left)
+        print("Right Camera Intrinsics: \n", K_right)
+        print("Right Camera Distortion Coefficients: \n", dist_right)
         print("Rotation Matrix: \n", R)
         print("Translation Vector: \n", T)
         print("Essential Matrix: \n", E)
@@ -120,6 +267,7 @@ class stereoRectify:
         """
         total_error = 0
         total_points = 0
+        error_list = []
         for i in range(len(object_points)):
             # å°†3Dç‚¹æŠ•å½±åˆ°å›¾åƒå¹³é¢
             imgpoints2, _ = cv2.projectPoints(object_points[i], rvecs[i], tvecs[i], camera_matrix, dist_coeffs)
@@ -127,25 +275,66 @@ class stereoRectify:
             error = cv2.norm(image_points[i], imgpoints2, cv2.NORM_L2)
             total_error += error**2
             total_points += len(object_points[i])
+            error_list.append(error)
+        mean_error = np.sqrt(total_error / total_points)
+        return mean_error, error_list
+
+    def compute_reprojection_error_single(self, object_points, image_points, rvecs, tvecs, camera_matrix, dist_coeffs):
+        """
+        è®¡ç®—æ‰€æœ‰å›¾åƒçš„é‡æŠ•å½±å‡æ–¹æ ¹è¯¯å·®(RMSE)
+        """
+        total_error = 0
+        total_points = 0
+        for i in range(len(object_points)):
+            # å°†3Dç‚¹æŠ•å½±åˆ°å›¾åƒå¹³é¢
+            imgpoints2, _ = cv2.projectPoints(object_points[i], rvecs[i], tvecs[i], camera_matrix, dist_coeffs)
+
+            # è®¡ç®—æŠ•å½±ç‚¹ä¸å®é™…æ£€æµ‹åˆ°çš„è§’ç‚¹ä¹‹é—´çš„æ¬§æ°è·ç¦»
+            error = cv2.norm(image_points[i], imgpoints2, cv2.NORM_L2)
+
+            total_error += error ** 2
+            total_points += len(object_points[i])
+
         mean_error = np.sqrt(total_error / total_points)
         return mean_error
     # è®¡ç®—æœ‰ç•¸å˜ç«‹ä½“æ ¡æ­£å˜æ¢
     def stereo_rectify_with_distortion(self, K_left, dist_left, K_right, dist_right, R, T, image_size):
-        # 1. è®¡ç®—æ ¡æ­£å˜æ¢çŸ©é˜µ
+
+        # å›¾åƒå°ºå¯¸
+        gdc_width, gdc_height = self.image_size    # åŸå§‹å›¾åƒå°ºå¯¸
+        out_width, out_height = self.image_size    # æ ¡æ­£åå›¾åƒå°ºå¯¸
+
+        # è°ƒç”¨stereoRectify
+        flags = cv2.CALIB_ZERO_DISPARITY    # å¼ºåˆ¶æ ¡æ­£åä¸»ç‚¹å‚ç›´å¯¹é½
+        alpha = 0                           # è‡ªåŠ¨è£å‰ªé»‘è¾¹
+        
         R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-            K_left, dist_left, K_right, dist_right, image_size, R, T#, alpha=0
-        )
+                cameraMatrix1=K_left, # å·¦ç›¸æœºå†…å‚
+                distCoeffs1=dist_left, # å·¦ç›¸æœºç•¸å˜ç³»æ•°
+                cameraMatrix2=K_right, # å³ç›¸æœºå†…å‚
+                distCoeffs2=dist_right, # å³ç›¸æœºç•¸å˜ç³»æ•°
+                imageSize=(gdc_width, gdc_height), # åŸå§‹å›¾åƒå°ºå¯¸
+                R=R, # æ—‹è½¬çŸ©é˜µ å³åˆ°å·¦çš„æ—‹è½¬çŸ©é˜µ
+                T=T, # å¹³ç§»çŸ©é˜µ å³åˆ°å·¦çš„å¹³ç§»å‘é‡
+                flags=flags, # æ ‡å¿—
+                alpha=alpha, # è‡ªåŠ¨è£å‰ªé»‘è¾¹
+                newImageSize=(out_width, out_height) # æ ¡æ­£åå›¾åƒå°ºå¯¸
+            )
         # 2. è®¡ç®—æ˜ å°„è¡¨ï¼ˆè€ƒè™‘ç•¸å˜ï¼‰
-        map1x, map1y = cv2.initUndistortRectifyMap(K_left, dist_left, R1, P1, image_size, cv2.CV_32FC1)
-        map2x, map2y = cv2.initUndistortRectifyMap(K_right, dist_right, R2, P2, image_size, cv2.CV_32FC1)
+        map1x, map1y = cv2.initUndistortRectifyMap(K_left, dist_left, R1, P1, self.image_size, cv2.CV_32FC1)
+        map2x, map2y = cv2.initUndistortRectifyMap(K_right, dist_right, R2, P2, self.image_size, cv2.CV_32FC1)
         
         return map1x, map1y, map2x, map2y, Q
     
     # è®¡ç®—æ— ç•¸å˜ç«‹ä½“æ ¡æ­£å˜æ¢
     def stereo_rectify_without_distortion(self, K_left, K_right, R, T, image_size):
         # 1. è®¡ç®—æ ¡æ­£å˜æ¢çŸ©é˜µ
+        print(K_left, K_right, R, T, image_size)
+        flags = cv2.CALIB_ZERO_DISPARITY
+        alpha = 0
+        newImageSize = image_size
         R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-            K_left, None, K_right, None, image_size, R, T
+            K_left, None, K_right, None, image_size, R, T, flags=flags, alpha=alpha, newImageSize=newImageSize
         )
         # 2. è®¡ç®—æ˜ å°„è¡¨ï¼ˆæ— ç•¸å˜ï¼Œä»…æ ¡æ­£ï¼‰
         map1x, map1y = cv2.initUndistortRectifyMap(K_left, None, R1, P1, image_size, cv2.CV_32FC1)
@@ -155,6 +344,7 @@ class stereoRectify:
 
     # è®¡ç®—fx,fy,cx,cy,baseline
     def calculate_fx_fy_cx_cy_baseline(self, Q):
+        Q = np.array(Q)
         self.cx = -Q[0, 3]
         self.cy = -Q[1, 3]
         self.fx = Q[2, 3]
@@ -163,6 +353,7 @@ class stereoRectify:
         # return self.fx, self.fy, self.cx, self.cy, self.baseline
     # åº”ç”¨æ ¡æ­£å˜æ¢
     def apply_rectification(self, left_img, right_img, map1x, map1y, map2x, map2y):
+        
         # 1. é‡æ˜ å°„
         rectified_left = cv2.remap(left_img, map1x, map1y, cv2.INTER_LINEAR)
         rectified_right = cv2.remap(right_img, map2x, map2y, cv2.INTER_LINEAR)
@@ -189,7 +380,7 @@ class stereoRectify:
         with open(file_path, 'r') as json_file:
             calibration_data = json.load(json_file)
         k_left, dist_left, k_right, dist_right, R, T, Q = calibration_data['k_left'], calibration_data['dist_left'], calibration_data['k_right'], calibration_data['dist_right'], calibration_data['R'], calibration_data['T'], calibration_data['Q']
-        # self.calculate_fx_fy_cx_cy_baseline(Q)
+        self.calculate_fx_fy_cx_cy_baseline(Q)
         return k_left, dist_left, k_right, dist_right, R, T, Q
     
     # å¯è§†åŒ–è§†å·®å›¾
@@ -209,23 +400,79 @@ class stereoRectify:
 
 if __name__ == "__main__":
     stereo_rectify = stereoRectify(findChessboardCorners=False)
-    
-    # å›¾åƒè·¯å¾„
-    img_dir_left = r"left"
-    img_dir_right = r"right"
-    img_type = "png"  # å›¾ç‰‡æ ¼å¼
+    method = 2
+    if method ==1:
+        # å›¾åƒè·¯å¾„
+        img_dir_left = r"left"
+        img_dir_right = r"right"
+        img_type = "png"  # å›¾ç‰‡æ ¼å¼
 
-    # åŠ è½½å›¾åƒæ–‡ä»¶
-    images_left = sorted(glob.glob(img_dir_left + os.sep + '*.' + img_type))
-    images_right = sorted(glob.glob(img_dir_right + os.sep + '*.' + img_type))
-    k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.stereo_calibrate(images_left, images_right)
-    stereo_rectify.save_calibration_to_json(k_left, dist_left, k_right, dist_right, R, T, Q)
-    
-    # è¯»å–å‚æ•°
-    # k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.load_calibration_from_json('cali_circle.json')
-    # print("calibration_data: \n", k_left, dist_left, k_right, dist_right, R, T, Q)
+        # åŠ è½½å›¾åƒæ–‡ä»¶
+        images_left = sorted(glob.glob(img_dir_left + os.sep + '*.' + img_type))
+        images_right = sorted(glob.glob(img_dir_right + os.sep + '*.' + img_type))
+        k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.stereo_calibrate(images_left, images_right)
+        stereo_rectify.save_calibration_to_json(k_left, dist_left, k_right, dist_right, R, T, Q)
+        
+        # çŸ«æ­£ä¸€å¼ å›¾
+        img_left = cv2.imread(images_left[0])
+        img_right = cv2.imread(images_right[0])
+        map1x, map1y, map2x, map2y, Q = stereo_rectify.stereo_rectify_without_distortion(k_left, k_right, R, T, stereo_rectify.image_size)
+        rectified_left, rectified_right = stereo_rectify.apply_rectification(img_left, img_right, map1x, map1y, map2x, map2y)
+        combined_img = cv2.resize(np.hstack((rectified_left, rectified_right)), (1280, 720))
+        
+        cv2.imshow('Rectified Left', combined_img)
+        cv2.waitKey(0)
+        # è¯»å–å‚æ•°
+        # k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.load_calibration_from_json('cali_circle.json')
+        # print("calibration_data: \n", k_left, dist_left, k_right, dist_right, R, T, Q)   
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             %$EÄĞ•Rj­ã8–—ËeDHnİºõø~é™gyäú#s%’lKb›àg’3"¢:mK
-EËVk}å;ÿü…/|á‘GÙÛÛ[¯×Àz½n­Íól»v­5wÀœÔZ§iªm@Rf²S<€Ìt§0§¸ã~Í6$Îa›c›_Il°-	°™t!©µÆ6Á6[IbÛ¼-u€ºÅb—m$±İ<ã<Ï¶%µÖ^}õÕO~ò“¿ıÛ¿ıíoû;ßùNDHZ¯×™	LÓÄ9l¶Û€íÖÌ6¥”ÖIŠˆRJkÍö0’,ÑI¢s'	Ä	ÛœPH"‚N§,w
-PºE7C)egggww÷Ê•+×®]{øá‡¯\¹µÖqØå™i(¥DDk-3ßxãÆ­[·nŞ¼ytt4Ïóz½ç¹µ6MSk­Öj°İºZóXÄ(ÉvfÒEDf¶Û€;¶i­q¶Ù¦”Â6™É}Ç Ilc›m"BgIbIt!	¨$E 	p±¤0ê"¢H€¤RÊb•R$dûá‡¯>şøãÿò¯/?óÌ3¥@%@™H~&Å±0“ú‰o|ã_ùÊWŞûŞ÷®×kàîİ»µÖišj­™i»Öš™µEfºËLÛ™é€»Ìt—™¶3pGç°™€m:Û€mÀ6§Ø2Ó6çğ)@fÚ¦“d°¸$qAî8+3m£ä,w<°ìØàj@ 	d;3Ù )•îÔef­µµvõêÕ'Ÿ|r±XDÄ½{÷^zé¥ƒƒƒår™gÙl¶Ût’Ø`›Î6™@v€¤àg$ÑIâç&%2÷‰®µVkm­Ù$Ù2°Øf»¸lg&íÌd}âù¸¥$@€$Ûl#
-ÛHbIœ¥SlsL)É)@RDH$QJ‰I@DÃm5—.]ªµ¢”´\Ó4E éæÍ›¯¿şú•«ûO>ùä³Ï>û¹Ï}Nò~ô£×^{mš¦ˆ˜¦ÉöÎÎ¤RÊ0t±èRqéÒ%§®\¹rõêÕú§úOÿéOŸ~úiI¼¥ğSi–D 	HÔq""€0’ I€N°!b$’ Il“BRâŸ Sdfëj­ÙÉHÔ’€ˆ “Ä&:@`Pê I€TEWJ‰ˆq#"¥”åri;"–ËåƒWl?ñÄ¿õ[¿µ¿¿?Ïs)%3#‚m‚ŸI~¦D©­ÎÙ"b,£P’é\Tß¸qãË_şò÷¿ÿı+W®,—Ëišl×Z3³vó<·H•ÖÚ4MëõºÖš™¶ˆ`›VÍY¶Ù&3m£äÛlÑ Û\m¶±ÍÈLŞI)…¶%ÙÎNR)…·%‰­BÇx
+    elif method == 2:
+        left_video_path = r"./20250306134745/step1-3/a0.avi"
+        right_video_path = r"./20250306134745/step1-3/a1.avi"
+        k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.stereo_calibrate_video(left_video_path, right_video_path)
+        stereo_rectify.save_calibration_to_json(k_left, dist_left, k_right, dist_right, R, T, Q)
+
+
+    elif method == 3:
+        k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.load_calibration_from_json(r'D:\BaiduSyncdisk\work\Stereo\stereo_test_optimized\data\ai\0305\20250305133700\20250305133700.json')
+        k_left, k_right, R, T, Q, dist_left, dist_right = np.array(k_left), np.array(k_right), np.array(R), np.array(T), np.array(Q), np.array(dist_left), np.array(dist_right)
+        # çŸ«æ­£è§†é¢‘
+        left_video_path = r"./20250306134745\step2-1/a0.avi"
+        right_video_path = r"./20250306134745\step2-1/a1.avi"
+        cap_left = cv2.VideoCapture(left_video_path)
+        cap_right = cv2.VideoCapture(right_video_path)
+        
+        # ä¿å­˜ä¸ºffv1è§†é¢‘
+        fourcc = cv2.VideoWriter_fourcc(*'FFV1')
+        out = cv2.VideoWriter('rectified_video.avi', fourcc, 30.0, (1056, 784 * 2))
+        while True:
+            ret_left, frame_left = cap_left.read()
+            ret_right, frame_right = cap_right.read()
+            # frame_left = cv2.flip(frame_left, 1)
+            # frame_right = cv2.flip(frame_right, 1)
+            if not ret_left or not ret_right:
+                break
+            map1x, map1y, map2x, map2y, _ = stereo_rectify.stereo_rectify_with_distortion(k_left, dist_left, k_right, dist_right, R, T, stereo_rectify.image_size)
+            # map1x, map1y, map2x, map2y, _ = stereo_rectify.stereo_rectify_without_distortion(k_left, k_right, R, T, stereo_rectify.image_size)
+                    # ç•¸å˜çŸ«æ­£
+            frame_left = cv2.undistort(frame_left, k_left, dist_left)
+            frame_right = cv2.undistort(frame_right, k_right, dist_right)
+            rectified_left, rectified_right = stereo_rectify.apply_rectification(frame_left, frame_right, map1x, map1y, map2x, map2y)
+            combined_img = np.vstack((rectified_left, rectified_right))
+            print(frame_left.shape, frame_right.shape)
+            print(combined_img.shape)
+            out.write(combined_img)
+            cv2.imshow('Rectified Left', combined_img)
+            # cv2.waitKey(1)
+            # ä½¿ç”¨sgbmå¾—åˆ°è§†å·®å›¾
+            # print(rectified_left.shape, rectified_right.shape)
+            # gray_left = cv2.cvtColor(rectified_left, cv2.COLOR_BGR2GRAY)
+            # gray_right = cv2.cvtColor(rectified_right, cv2.COLOR_BGR2GRAY)
+            # å·¦å³å›¾åˆ’å¤šä¸ªçº¿çº¿åˆ¤æ–­æ˜¯å¦å¯¹é½
+            for i in range(10):
+                cv2.line(rectified_left, (0, 100 + i * 50), (1056, 100 + i * 50), (0, 0, 255), 1)
+                cv2.line(rectified_right, (0, 100 + i * 50), (1056, 100 + i * 50), (0, 0, 255), 1)
+            combined_img = np.hstack((rectified_left, rectified_right))
+            cv2.imshow('Rectified Right', combined_img)
+            cv2.waitKey(1)
+        out.release()

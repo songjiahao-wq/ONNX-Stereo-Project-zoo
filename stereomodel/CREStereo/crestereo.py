@@ -30,7 +30,7 @@ class CREStereo_TRT(BaseTRTInference):
         return disp_pred
 if __name__ == '__main__':
     Stereo = Stereo(res_height=480, res_width=640)
-    use_onnx = False
+    use_onnx = True
     if use_onnx:
         # Initialize model
         model_path = './weights/crestereo_init_iter2_480x640.onnx'
@@ -40,8 +40,8 @@ if __name__ == '__main__':
         model_path = './weights/crestereo_init_iter2_480x640fp32.engine'
         depth_estimator = CREStereo_TRT(model_path)
     # Load images
-    left_img = cv2.imread('../../data/1056x784/im0 copy.png')
-    right_img = cv2.imread('../../data/1056x784/im1 copy.png')
+    left_img = cv2.imread('../../data/640x352/im0.png')
+    right_img = cv2.imread('../../data/640x352/im1.png')
 
     # Estimate depth and colorize it
     for i in range(1):
@@ -52,4 +52,4 @@ if __name__ == '__main__':
 
     cv2.namedWindow("Estimated disparity", cv2.WINDOW_NORMAL)
     cv2.imshow("Estimated disparity", combined_img)
-    cv2
+    cv2.waitKey(0)
