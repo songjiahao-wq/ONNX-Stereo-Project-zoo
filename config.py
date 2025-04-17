@@ -37,26 +37,21 @@ calib_data = {
 }
 class CameraIntrinsics:
     def getIntrinsics_AI(self):
-
+        # 844.3438051225781 844.3438051225781 477.8058853149414 389.5643768310547 0.10922234155495113
         height = 1056
         width = 784
+        left_k, right_k, left_distortion, right_distortion, r, t, q = self.read_calib(r"D:\BaiduSyncdisk\work\Stereo\ONNX-Stereo-Project-zoo\calibration\cali_circle.json")
+
+        fx, fy, cx, cy = p1[0, 0], p1[1, 1], p1[0, 2], p1[1, 2]
         p = [
-            752.598, 0.0, 535.039, 33.82135389646828,
-            0.0, 752.598, 386.481, 0.0,
+            844.3438051225781, 0.0, 477.8058853149414, 389.5643768310547,
+            0.0, 844.3438051225781, 389.5643768310547, 0.0,
             0.0, 0.0, 1.0, 0.0
         ]
-        # p = [
-        #     751.366, 0.0, 537.485, 33.82135389646828,
-        #     0.0, 752.904, 383.444, 0.0,
-        #     0.0, 0.0, 1.0, 0.0
-        # ]
-        # p = [
-        #     745.59004729, 0.0, 439.3305969238281, 33.82135389646828,
-        #     0.0, 745.59004729, 391.6967468261719, 0.0,
-        #     0.0, 0.0, 1.0, 0.0
-        # ]
-        baseline = 0.10689529687646554
+
+        baseline = 0.10922234155495113
         return height, width, p, baseline
+
     def getIntrinsics1920_1080(self):
         height = 1080
         width = 1920
@@ -141,7 +136,7 @@ class CameraIntrinsics:
 
 class Stereo:
     def __init__(self, res_height=640, res_width=1280):
-        ori_height, ori_width, p, baseline = CameraIntrinsics().getIntrinsics_AI()
+        ori_height, ori_width, p, baseline = CameraIntrinsics().getIntrinsics640_480()
 
         self.fx, self.fy, self.cx, self.cy, self.baseline = p[0], p[5], p[2], p[6], baseline * 1000
         scale_x = res_width / ori_width  # 宽度缩放比例
@@ -267,6 +262,18 @@ class Stereo:
 
         # 伪彩色映射
         depth_colormap = cv2.applyColorMap(depth_vis, colormap)
+        return depth_colormap
+    def visualize_disp(self, disp, colormap=cv2.COLORMAP_MAGMA):
+        norm = ((disp - disp.min()) / (disp.max() - disp.min()) * 255).astype(np.uint8)
+        depth_colormap = cv2.applyColorMap(norm, cv2.COLORMAP_PLASMA)
+        # # 归一化到 0-255
+        # depth_min = 0.3376  # np.min(depth_filtered)
+        # depth_max = 20.0000  # np.max(depth_filtered)
+        # depth_norm = (depth_filtered - depth_min) / (depth_max - depth_min)  # 归一化到 0-1
+        # depth_vis = (depth_norm * 255).astype(np.uint8)  # 转换为 0-255 范围
+
+        # # 伪彩色映射
+        # depth_colormap = cv2.applyColorMap(depth_vis, colormap)
         return depth_colormap
     def show_depth_point(self, disp1, rectifyed_left, scale=1):
         self.scale = scale

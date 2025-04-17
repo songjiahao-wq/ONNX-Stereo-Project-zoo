@@ -80,7 +80,7 @@ def convert_onnx_to_trt(onnx_path, fp16=True):
 
 
 # 运行转换
-onnx_models = ["stereomodel\IGEV\weights\IGEV_middlebury_iter4_480x640.onnx"]
+onnx_models = [r"stereomodel\IGEV++RTStereo\weights\rt_sceneflow_dy.onnx"]
 
 for model in onnx_models:
     if os.path.exists(model):

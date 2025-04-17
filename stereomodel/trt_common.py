@@ -142,4 +142,4 @@ class BaseTRTInference:
         cuda.Context.synchronize()
         end_time = time.time()
         
-        print(f"🔹 推理耗时: {(end_time - start_time)} ms)
+        print(f"🔹 推理耗时: {(end_time - start_time) * 1000} ms")

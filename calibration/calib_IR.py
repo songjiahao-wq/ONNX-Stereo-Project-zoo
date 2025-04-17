@@ -12,7 +12,7 @@ import cv2
 import glob
 
 
-def calib(inter_corner_shape, size_per_grid, img_dir,img_type):
+def calib(inter_corner_shape, size_per_grid, video_path):
     # criteria: only for subpix calibration, which is not used here.
     # criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
     w,h = inter_corner_shape
@@ -25,69 +25,88 @@ def calib(inter_corner_shape, size_per_grid, img_dir,img_type):
     
     obj_points = [] # the points in world space
     img_points = [] # the points in image space (relevant to obj_points)
-    images = glob.glob(img_dir + os.sep + '**.' + img_type)
-    print(images)
-    for fname in images:
-        img = cv2.imread(fname)
-        gray_img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-        # find the corners, cp_img: corner points in pixel space.
-        # ret, cp_img = cv2.findChessboardCorners(gray_img, (w,h), None)
-        # 圆形
-        ret, cp_img = cv2.findCirclesGrid(gray_img, (w,h), None)
-        # if ret is True, save.
-        if ret == True:
-            # cv2.cornerSubPix(gray_img,cp_img,(11,11),(-1,-1),criteria)
-            obj_points.append(cp_world)
-            img_points.append(cp_img)
-            # view the corners
-            cv2.drawChessboardCorners(img, (w,h), cp_img, ret)
-            cv2.imshow('FoundCorners',img)
-            cv2.waitKey(1)
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    detect_count = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame_count += 1
+        if frame_count % 20 == 0 and detect_count < 40:
+            detect_count += 1
+            print(f"Detecting... {detect_count}th frame")
+            gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Find corners for chessboard or circle grid (commented out chessboard code)
+            ret, cp_img = cv2.findCirclesGrid(gray_img, (w, h), None)
+
+            if ret:
+                obj_points.append(cp_world)
+                img_points.append(cp_img)
+
+                # Optional: Show the detected corners
+                cv2.drawChessboardCorners(frame, (w, h), cp_img, ret)
+                cv2.imshow('FoundCorners', frame)
+                cv2.waitKey(1)
     cv2.destroyAllWindows()
     # calibrate the camera
     ret, mat_inter, coff_dis, v_rot, v_trans = cv2.calibrateCamera(obj_points, img_points, gray_img.shape[::-1], None, None)
-    print (("ret:"),ret)
-    print (("internal matrix:\n"),mat_inter)
-    # in the form of (k_1,k_2,p_1,p_2,k_3)
-    print (("distortion cofficients:\n"),coff_dis)  
-    print (("rotation vectors:\n"),v_rot)
-    print (("translation vectors:\n"),v_trans)
-    # calculate the error of reproject
+    if not ret:
+        print("Error: Calibration failed.")
+        return None, None
+
+    print(f"ret: {ret}")
+    print(f"Internal Matrix (Camera Matrix):\n{mat_inter}")
+    print(f"Distortion Coefficients:\n{coff_dis}")
+    # print(f"Rotation Vectors:\n{v_rot}")
+    # print(f"Translation Vectors:\n{v_trans}")
+
+    # Calculate the reproject error
     total_error = 0
     for i in range(len(obj_points)):
         img_points_repro, _ = cv2.projectPoints(obj_points[i], v_rot[i], v_trans[i], mat_inter, coff_dis)
-        error = cv2.norm(img_points[i], img_points_repro, cv2.NORM_L2)/len(img_points_repro)
+        error = cv2.norm(img_points[i], img_points_repro, cv2.NORM_L2) / len(img_points_repro)
+        print(f"error: {error}")
         total_error += error
-    print(("Average Error of Reproject: "), total_error/len(obj_points))
-    
+    print(f"Average Reprojection Error: {total_error / len(obj_points)}")
+
     return mat_inter, coff_dis
     
-def dedistortion(inter_corner_shape, img_dir,img_type, save_dir, mat_inter, coff_dis):
+def dedistortion(inter_corner_shape, video_path, mat_inter, coff_dis):
     w,h = inter_corner_shape
-    images = glob.glob(img_dir + os.sep + '**.' + img_type)
-    for fname in images:
-        img_name = fname.split(os.sep)[-1]
-        img = cv2.imread(fname)
+    cap = cv2.VideoCapture(video_path)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        img = frame
         newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mat_inter,coff_dis,(w,h),0,(w,h)) # 自由比例参数
         dst = cv2.undistort(img, mat_inter, coff_dis, None, newcameramtx)
         # clip the image
         # x,y,w,h = roi
         # dst = dst[y:y+h, x:x+w]
-        cv2.imwrite(save_dir + os.sep + img_name, dst)
+        combined = np.vstack((img, dst))
+        cv2.imshow('dst', combined)
+        cv2.waitKey(0)
     print('Dedistorted images have been saved to: %s successfully.' %save_dir)
     
 if __name__ == '__main__':
     inter_corner_shape = (9,6)
     size_per_grid = 0.0914
     img_dir = "a1"
-    img_type = "png"
+    video_path = r"../calibration/data/20250416155006/step1/a0.avi"
     # calibrate the camera
-    mat_inter, coff_dis = calib(inter_corner_shape, size_per_grid, img_dir,img_type)
+    mat_inter, coff_dis = calib(inter_corner_shape, size_per_grid, video_path)
+    
+    
+    
+    
     # dedistort and save the dedistortion result. 
-    save_dir = "data/save_dedistortion"
-    if(not os.path.exists(save_dir)):
-        os.makedirs(save_dir)
-    dedistortion(inter_corner_shape, img_dir, img_type, save_dir, mat_inter, coff_dis)
+    # save_dir = "data/save_dedistortion"
+    # if(not os.path.exists(save_dir)):
+        # os.makedirs(save_dir)
+    # dedistortion(inter_corner_shape, video_path, mat_inter, coff_dis)
     
     
     

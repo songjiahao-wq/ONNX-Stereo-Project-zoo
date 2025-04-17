@@ -155,7 +155,7 @@ class stereoRectify:
             if not ret_left or not ret_right:
                 break
             frame_count += 1
-            if frame_count % 20 == 0:
+            if frame_count % 20== 0 and detect_count < 100:
                 gray_left = cv2.cvtColor(frame_left, cv2.COLOR_BGR2GRAY)
                 gray_right = cv2.cvtColor(frame_right, cv2.COLOR_BGR2GRAY)
                 flags = (cv2.CALIB_CB_SYMMETRIC_GRID) 
@@ -163,12 +163,12 @@ class stereoRectify:
                 #  cv2.CALIB_CB_ASYMMETRIC_GRID)  # 适应非对称排列
                 ret_left, corners_left = cv2.findCirclesGrid(gray_left, self.board_size, None) 
                 ret_right, corners_right = cv2.findCirclesGrid(gray_right, self.board_size, None)
-                remove_index_left = [4, 5, 8, 13, 14, 18, 20]
-                remove_index_right = [3, 4, 8, 13, 14, 18, 20, 23]
+                remove_index_left =   [7, 11, 14, 32, 38]
+                remove_index_right =  [7, 11, 14, 26, 32, 38]
                 if ret_left and ret_right:
-                    if detect_count in remove_index_left or detect_count in remove_index_right:
-                        detect_count += 1
-                        continue
+                    # if detect_count in remove_index_left or detect_count in remove_index_right:
+                    #     detect_count += 1
+                    #     continue
                     
                     detect_count += 1
                     print("detect_count: ", detect_count)
@@ -193,7 +193,7 @@ class stereoRectify:
         ret_right, K_right, dist_right, rvecs_right, tvecs_right = cv2.calibrateCamera(
             obj_points, right_img_points, gray_right.shape[::-1], None, None
         )
-        # OmtxL, roiL = cv2.getOptimalNewCameraMatrix(K_left, dist_left, self.image_size, alpha=0, newImgSize=self.image_size)
+        # OmtxL, roiL = cv2.getOptimalNewCameraMatrix(K_left, dist_left, self.image_size, alpha=1, newImgSize=self.image_size)
         # OmtxR, roiR = cv2.getOptimalNewCameraMatrix(K_right, dist_right,  self.image_size, alpha=0, newImgSize=self.image_size)
         # 4. 双目标定（计算旋转矩阵 R 和平移向量 T）
         ret, _, _, _, _, R, T, E, F = cv2.stereoCalibrate(
@@ -254,11 +254,11 @@ class stereoRectify:
         print("Fundamental Matrix: \n", F)
         print("Q Matrix: \n", Q)
         self.calculate_fx_fy_cx_cy_baseline(np.array(Q))
-        print("fx: \n", self.fx)
-        print("fy: \n", self.fy)
-        print("cx: \n", self.cx)
-        print("cy: \n", self.cy)
-        print("baseline: \n", self.baseline)
+        print("fx=", self.fx)
+        print("fy=", self.fy)
+        print("cx=", self.cx)
+        print("cy=", self.cy)
+        print("baseline=", self.baseline)
         return K_left, dist_left, K_right, dist_right, R, T, Q
     # 计算重投影误差
     def compute_reprojection_error(self, object_points, image_points, rvecs, tvecs, camera_matrix, dist_coeffs):
@@ -302,7 +302,7 @@ class stereoRectify:
 
         # 图像尺寸
         gdc_width, gdc_height = self.image_size    # 原始图像尺寸
-        out_width, out_height = self.image_size    # 校正后图像尺寸
+        out_width, out_height = self.image_size     # 校正后图像尺寸
 
         # 调用stereoRectify
         flags = cv2.CALIB_ZERO_DISPARITY    # 强制校正后主点垂直对齐
@@ -400,7 +400,7 @@ class stereoRectify:
 
 if __name__ == "__main__":
     stereo_rectify = stereoRectify(findChessboardCorners=False)
-    method = 2
+    method = 3
     if method ==1:
         # 图像路径
         img_dir_left = r"left"
@@ -427,20 +427,32 @@ if __name__ == "__main__":
         # print("calibration_data: \n", k_left, dist_left, k_right, dist_right, R, T, Q)   
 
     elif method == 2:
-        left_video_path = r"./20250306134745/step1-3/a0.avi"
-        right_video_path = r"./20250306134745/step1-3/a1.avi"
+        left_video_path = r"../calibration/data/20250306134745\step1-3/a0.avi"
+        right_video_path = r"../calibration/data/20250306134745\step1-3/a1.avi"
+        
+        # left_video_path = r"../calibration/data/20250416155006\step1/a0.avi"
+        # right_video_path = r"../calibration/data/20250416155006\step1/a1.avi"
         k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.stereo_calibrate_video(left_video_path, right_video_path)
         stereo_rectify.save_calibration_to_json(k_left, dist_left, k_right, dist_right, R, T, Q)
 
 
     elif method == 3:
-        k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.load_calibration_from_json(r'D:\BaiduSyncdisk\work\Stereo\stereo_test_optimized\data\ai\0305\20250305133700\20250305133700.json')
+        k_left, dist_left, k_right, dist_right, R, T, Q = stereo_rectify.load_calibration_from_json(r'cali_circle.json')
+        print(stereo_rectify.fx, stereo_rectify.fy, stereo_rectify.cx, stereo_rectify.cy, stereo_rectify.baseline)
         k_left, k_right, R, T, Q, dist_left, dist_right = np.array(k_left), np.array(k_right), np.array(R), np.array(T), np.array(Q), np.array(dist_left), np.array(dist_right)
         # 矫正视频
-        left_video_path = r"./20250306134745\step2-1/a0.avi"
-        right_video_path = r"./20250306134745\step2-1/a1.avi"
+        left_video_path = r"../calibration/data/20250306134745\step2-1/a0.avi"
+        right_video_path = r"../calibration/data/20250306134745\step2-1/a1.avi"
+        
+        # left_video_path = r"../calibration\data\20250305144726\step2-5/a0.avi"
+        # right_video_path = r"../calibration\data\20250305144726\step2-5/a1.avi"
+        
+        left_video_path = r"../calibration/data/20250417104342\step2/a0.avi"
+        right_video_path = r"../calibration/data/20250417104342\step2/a1.avi"
+        
         cap_left = cv2.VideoCapture(left_video_path)
         cap_right = cv2.VideoCapture(right_video_path)
+        
         
         # 保存为ffv1视频
         fourcc = cv2.VideoWriter_fourcc(*'FFV1')
