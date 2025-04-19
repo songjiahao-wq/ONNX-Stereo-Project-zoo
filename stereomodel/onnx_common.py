@@ -108,13 +108,17 @@ class BaseONNXInference():
         return camera_config.f * camera_config.baseline / disparity_map
 
     def draw_disparity(self):
-        disparity_map = cv2.resize(self.disparity_map, (self.img_width, self.img_height))
+        disparity_map = cv2.resize(self.disparity_map, (self.input_width, self.input_height))
         print(np.min(disparity_map), np.max(disparity_map))
         norm_disparity_map = 255 * ((disparity_map - np.min(disparity_map)) /
                                     (np.max(disparity_map) - np.min(disparity_map)))
 
         return cv2.applyColorMap(cv2.convertScaleAbs(norm_disparity_map, 1), cv2.COLORMAP_JET)
-
+    def draw_disparity2(self):
+        disparity_map = cv2.resize(self.disparity_map, (self.input_width, self.input_height))
+        norm = ((disparity_map - disparity_map.min()) / (disparity_map.max() - disparity_map.min()) * 255).astype(np.uint8)
+        colored = cv2.applyColorMap(norm, cv2.COLORMAP_PLASMA)
+        return colored
     def draw_depth(self):
 
         return self.util_draw_depth(self.depth_map, (self.img_width, self.img_height), self.max_dist)

@@ -25,68 +25,40 @@ class HITStereo_ONNX(BaseONNXInference):
     def __init__(self, model_path):
         super().__init__(model_path)
         self.model_type = ModelType.middlebury
-
+        self.input_width = 640
+        self.input_height = 480
     def __call__(self, left_img, right_img):
         return self.update(left_img, right_img)
+    def inference_without_flow(self, left_tensor, right_tensor):
+        print(left_tensor.shape, right_tensor.shape)
+        return self.session.run(self.output_names, {self.input_names[0]: left_tensor,
+                                                    self.input_names[1]: right_tensor})[0]
+    def np2numpy(self,x, t=True, bgr=False):
+        x = cv2.resize(x, (self.input_width, self.input_height))
+        
+        if len(x.shape) == 2:
+            x = x[..., None]  # 将灰度图像扩展为 3 通道（最后一个维度为 1）
+        
+        if bgr:
+            x = x[..., [2, 1, 0]]  # 将 BGR 转换为 RGB
+            print(x.shape,'aaaaaaaaaaaaa')
+        if t:
+            x = np.transpose(x, (2, 0, 1))  # 将 HWC 格式转为 CHW 格式
+            print(x.shape,'aaaaaaaaaaaaa')
+        print(x.dtype,'aaaaaaaaaaaaa')
+        if x.dtype == np.uint8:
+            x = x.astype(np.float32)  # 将 uint8 转换为 [0, 1] 范围的 float32
+        
+        return x
+    def prepare_input(self, img):
+        img = self.np2numpy(img, t=True, bgr=True) / 255.0
+        img = img[np.newaxis, :, :, :]
+        print(img.shape,'aaaaaaaaaaaaa')
+        return img.astype(np.float32)
 
-    def update(self, left_img, right_img):
 
-        input_tensor = self.prepare_input(left_img, right_img)
-
-        # Perform inference on the image
-        if self.model_type == ModelType.flyingthings:
-            left_disparity, right_disparity = self.inference(input_tensor)
-            self.disparity_map = left_disparity
-        else:
-            self.disparity_map = self.inference(input_tensor)
-
-        # Estimate depth map from the disparity
-        self.depth_map = self.get_depth_from_disparity(self.disparity_map, self.camera_config)
-
-        return self.disparity_map
-
-    def inference(self, input_tensor):
-
-        input_name = self.session.get_inputs()[0].name
-        left_output_name = self.session.get_outputs()[0].name
-
-        if self.model_type is not ModelType.flyingthings:
-            left_disparity = self.session.run([left_output_name], {input_name: input_tensor})
-            return np.squeeze(left_disparity)
-
-        right_output_name = self.session.get_outputs()[1].name
-        left_disparity, right_disparity = self.session.run([left_output_name, right_output_name], {
-            input_name: input_tensor})
-
-        return np.squeeze(left_disparity), np.squeeze(right_disparity)
-
-    def prepare_input(self, left_img, right_img):
-
-        self.img_height, self.img_width = left_img.shape[:2]
-
-        left_img = cv2.resize(left_img, (self.input_width, self.input_height))
-        right_img = cv2.resize(right_img, (self.input_width, self.input_height))
-
-        if (self.model_type is ModelType.eth3d):
-
-            # Shape (1, 2, None, None)
-            left_img = cv2.cvtColor(left_img, cv2.COLOR_BGR2GRAY)
-            right_img = cv2.cvtColor(right_img, cv2.COLOR_BGR2GRAY)
-
-            left_img = np.expand_dims(left_img, 2)
-            right_img = np.expand_dims(right_img, 2)
-
-            combined_img = np.concatenate((left_img, right_img), axis=-1) / 255.0
-        else:
-            # Shape (1, 6, None, None)
-            left_img = cv2.cvtColor(left_img, cv2.COLOR_BGR2RGB)
-            right_img = cv2.cvtColor(right_img, cv2.COLOR_BGR2RGB)
-
-            combined_img = np.concatenate((left_img, right_img), axis=-1) / 255.0
-
-        combined_img = combined_img.transpose(2, 0, 1)
-
-        return np.expand_dims(combined_img, 0).astype(np.float32)
+    def process_output(self, output):
+        return np.squeeze(output)
 
 
 class HITStereo_TRT(BaseTRTInference):
@@ -152,10 +124,10 @@ class HITStereo_TRT(BaseTRTInference):
         print(f"🔹 推理耗时: {(end_time - start_time)} ms")
 
 if __name__ == '__main__':
-    use_onnx = False
+    use_onnx = True
     if use_onnx:
         # Initialize model
-        model_path = '../HITStereo/weights/model_float32_opt.onnx'
+        model_path = 'weights/stereo_net_480x640_nonopt.onnx'
         depth_estimator = HITStereo_ONNX(model_path)
     else:
         # Initialize model
@@ -165,4 +137,11 @@ if __name__ == '__main__':
         # model_path = './weights/model_float32fp32.engine'
         depth_estimator = HITStereo_TRT(model_path)
     # Load images
-  
+    left_img = cv2.imread(r'D:\BaiduSyncdisk\work\Stereo\data/111/im0.png', cv2.IMREAD_COLOR)
+    right_img = cv2.imread(r'D:\BaiduSyncdisk\work\Stereo\data/111/im1.png', cv2.IMREAD_COLOR)
+    disparity_map = depth_estimator(left_img, right_img)
+    disparity_map = depth_estimator.draw_disparity()
+    cv2.imshow('disparity_map', disparity_map)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+

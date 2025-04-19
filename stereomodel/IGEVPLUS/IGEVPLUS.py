@@ -52,7 +52,7 @@ if __name__ == '__main__':
     if use_onnx:
         # Initialize model
         model_path = './weights/rt_sceneflow_640480.onnx'
-        depth_estimator = IGEVStereo_ONNX(model_path)
+        depth_estimator = IGEVplusStereo_ONNX(model_path)
     else:
         # Initialize model
         model_path = './weights/rt_sceneflow_640480fp16 copy.engine'

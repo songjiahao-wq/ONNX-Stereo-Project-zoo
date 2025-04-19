@@ -124,7 +124,7 @@ class BaseTRTInference:
         return outputs
 
     def draw_disparity(self):
-        disparity_map = cv2.resize(self.disparity_map, (self.img_width, self.img_height))
+        disparity_map = cv2.resize(self.disparity_map, (self.width, self.height))
         
         # print(np.max(disparity_map), np.min(disparity_map))
         

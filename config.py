@@ -9,48 +9,30 @@ import cv2
 import json
 import open3d as o3d
 from matplotlib import pyplot as plt
-calib_data = {
-    "stereo0": {
-        "cam0": {
-            "cam_overlaps": [1],
-            "camera_model": "pinhole",
-            "distortion_coeffs": [0.75575636, 0.09272825, -0.00010397, -2.675e-05, 0.00094747, 1.13111697, 0.27240028,
-                                  0.01046174],
-            "distortion_model": "radtan",
-            "intrinsics": [788.4632328500001, 788.70885008, 961.0316543599999, 527.5127149800001],  # fx, fy, cx, cy
-            "resolution": [1920, 1080]
-        },
-        "cam1": {
-            "T_cn_cnm1": [
-                [0.99997798, 0.00066776, -0.00660303, -0.07090623],
-                [-0.00073086, 0.99995405, -0.00955833, 0.0],
-                [0.00659635, 0.00956294, 0.99993252, 0.0]
-            ],
-            "camera_model": "pinhole",
-            "distortion_coeffs": [0.75575636, 0.09272825, 0.00013049, -1.3e-07, 0.00094747, 1.13111697, 0.27240028,
-                                  0.01046174],
-            "distortion_model": "radtan",
-            "intrinsics": [786.9761893, 786.9329483400001, 962.2218096, 521.79998306],  # fx, fy, cx, cy
-            "resolution": [1920, 1080]
-        }
-    }
-}
+
 class CameraIntrinsics:
-    def getIntrinsics_AI(self):
-        # 844.3438051225781 844.3438051225781 477.8058853149414 389.5643768310547 0.10922234155495113
-        height = 1056
-        width = 784
-        left_k, right_k, left_distortion, right_distortion, r, t, q = self.read_calib(r"D:\BaiduSyncdisk\work\Stereo\ONNX-Stereo-Project-zoo\calibration\cali_circle.json")
+    def read_calib(self, calib_path):
+        # 读取标定文件
+        with open(calib_path, 'r') as f:
+            calib_data = json.load(f)
 
-        fx, fy, cx, cy = p1[0, 0], p1[1, 1], p1[0, 2], p1[1, 2]
-        p = [
-            844.3438051225781, 0.0, 477.8058853149414, 389.5643768310547,
-            0.0, 844.3438051225781, 389.5643768310547, 0.0,
-            0.0, 0.0, 1.0, 0.0
-        ]
+        left_k = np.array(calib_data['k_left'])
+        right_k = np.array(calib_data['k_right'])
+        left_distortion = np.array(calib_data['dist_left'])
+        right_distortion = np.array(calib_data['dist_right'])
+        # left_Q = np.array(calib_data['left_camera_intrinsics']['Q_left'])
+        # right_Q = np.array(calib_data['right_camera_intrinsics']['Q_right'])
+        rotation_matrix = np.array(calib_data['R'])
+        translation_vector = np.array(calib_data['T'])
+        Q_matrix = np.array(calib_data['Q'])
+        # inverse_extrinsic = np.array(calib_data['extrinsic']['inverse_extrinsic_matrix'])
+        # R = inverse_extrinsic[:3, :3]
+        # T = inverse_extrinsic[:3, 3]
+        # T = T.reshape(3, 1)
+        # T = np.array(calib_data['extrinsic']['t'])
 
-        baseline = 0.10922234155495113
-        return height, width, p, baseline
+        return left_k, right_k, left_distortion, right_distortion, rotation_matrix, translation_vector, Q_matrix
+
 
     def getIntrinsics1920_1080(self):
         height = 1080
@@ -132,11 +114,32 @@ class CameraIntrinsics:
         ]
         baseline = 0.07090622931718826
         return height, width, p, baseline
+    def getIntrinsics_AI(self):
+        # 844.3438051225781 844.3438051225781 477.8058853149414 389.5643768310547 0.10922234155495113
+        fx = 804.9994132393497
+        fy = 804.9994132393497
+        cx = 553.6901931762695
+        cy = 390.94061279296875
+        baseline = 0.10849556291708938
+        height = 784
+        width = 1056
+        left_k, right_k, left_distortion, right_distortion, r, t, q = self.read_calib(r"D:\BaiduSyncdisk\work\Stereo\ONNX-Stereo-Project-zoo\calibration\cali_circle.json")
+        r1, r2, p1, p2, q, roi1, roi2 = cv2.stereoRectify(left_k, left_distortion, right_k, right_distortion,
+                                                          (width, height), r, t, alpha=0)
+        fx, fy, cx, cy = p1[0, 0], p1[1, 1], p1[0, 2], p1[1, 2]
+        baseline = abs(1 / q[3, 2]) if q[3, 2] != 0 else 0
+        p = [
+            fx, 0.0, cx, 389.5643768310547,
+            0.0, fy, cy, 0.0,
+            0.0, 0.0, 1.0, 0.0
+        ]
 
+        baseline = baseline
+        return height, width, p, baseline
 
 class Stereo:
-    def __init__(self, res_height=640, res_width=1280):
-        ori_height, ori_width, p, baseline = CameraIntrinsics().getIntrinsics640_480()
+    def __init__(self, res_height=480, res_width=640):
+        ori_height, ori_width, p, baseline = CameraIntrinsics().getIntrinsics_AI()
 
         self.fx, self.fy, self.cx, self.cy, self.baseline = p[0], p[5], p[2], p[6], baseline * 1000
         scale_x = res_width / ori_width  # 宽度缩放比例
@@ -150,6 +153,13 @@ class Stereo:
         self.depth_map = None
         print(self.fx, self.fy, self.cx, self.cy, self.baseline)
 
+        self.min_depth, self.max_depth = 1, 10
+        self.Q_matrix = np.array([[self.fx, 0, self.cx, 0],
+                                  [0, self.fy, self.cy, 0],
+                                  [0, 0, 1, 0],
+                                  [0, 0, abs(1 / self.baseline), 1]])
+        
+        
     def reset_calib(self, scale_x, scale_y):
         self.fx, self.fy, self.cx, self.cy = self.fx * scale_x, self.fy * scale_y, self.cx * scale_x, self.cy * scale_y
         self.depth_cam_matrix = np.array([[self.fx, 0, self.cx],
@@ -182,28 +192,38 @@ class Stereo:
         depth_16bit = depth_mm.astype(np.uint16)
         cv2.imwrite('./runs/depth_16bit.png', depth_16bit)
 
-    def visualize_disp(self, depth_filtered, colormap=cv2.COLORMAP_MAGMA):
-        # 归一化到 0-255
-        depth_min = 0.3376  # np.min(depth_filtered)
-        depth_max = 20.0000  # np.max(depth_filtered)
-        depth_norm = (depth_filtered - depth_min) / (depth_max - depth_min)  # 归一化到 0-1
-        depth_vis = (depth_norm * 255).astype(np.uint8)  # 转换为 0-255 范围
+    def visualize_disp(self, disp, colormap=cv2.COLORMAP_MAGMA):
+        norm = ((disp - disp.min()) / (disp.max() - disp.min()) * 255).astype(np.uint8)
+        depth_colormap = cv2.applyColorMap(norm, cv2.COLORMAP_PLASMA)
+        # # 归一化到 0-255
+        # depth_min = 0.3376  # np.min(depth_filtered)
+        # depth_max = 20.0000  # np.max(depth_filtered)
+        # depth_norm = (depth_filtered - depth_min) / (depth_max - depth_min)  # 归一化到 0-1
+        # depth_vis = (depth_norm * 255).astype(np.uint8)  # 转换为 0-255 范围
 
-        # 伪彩色映射
-        depth_colormap = cv2.applyColorMap(depth_vis, colormap)
+        # # 伪彩色映射
+        # depth_colormap = cv2.applyColorMap(depth_vis, colormap)
         return depth_colormap
 
     def on_mouse(self, event, x, y, flags, param):
         """ 鼠标点击事件，获取像素点的 3D 坐标 """
-
+        '使用Q矩阵计算'
         if event == cv2.EVENT_LBUTTONDOWN:
-
+            disp = param
             point_3d = self.xy_3d(x, y, self.depth_map, self.depth_cam_matrix)
+            # point_3d = self.xy_3d2(x=x, y=y, displ=disp, max_step=10)
             if None in point_3d:
                 print(f"点 ({x}, {y}) 的深度无效")
             else:
                 print(f"点 ({x}, {y}) 的三维坐标: X={point_3d[0]:.3f}, Y={point_3d[1]:.3f}, Z={point_3d[2]:.3f} m")
-
+        
+        '使用深度图计算'
+        # if event == cv2.EVENT_LBUTTONDOWN:
+        #     point_3d = self.xy_3d1(x, y, self.depth_map, self.depth_cam_matrix)
+        #     if None in point_3d:
+        #         print(f"点 ({x}, {y}) 的深度无效")
+        #     else:
+        #         print(f"点 ({x}, {y}) 的三维坐标: X={point_3d[0]:.3f}, Y={point_3d[1]:.3f}, Z={point_3d[2]:.3f} m")
     def xy_3d(self, x, y, depth_map=None, depth_cam_matrix=None, depth_scale=1000):
         """ 将图像坐标 (x, y) 转换为 3D 世界坐标 """
         fx, fy = depth_cam_matrix[0, 0], depth_cam_matrix[1, 1]
@@ -217,7 +237,41 @@ class Stereo:
         Y = (y - cy) * z / fy
 
         return np.array([X, Y, z])
+    def xy_3d2(self, x, y, displ, max_step=10):
+        def get_disparity(min_depth):
+            focal_length = self.Q_matrix[2, 3]
+            focal_length = focal_length.astype(float)
+            base_line_inverse = self.Q_matrix[3, 2]
+            base_line_inverse = base_line_inverse.astype(float)
+            pixel_dis = focal_length / float(min_depth * base_line_inverse) 
+            return pixel_dis
+        
+        max_disparity = abs(get_disparity(self.min_depth))
+        min_disparity = abs(get_disparity(self.max_depth))
+        height, width = displ.shape
+        surrounding_values = []
+        step = 1
+        
+        # 避免无限循环
+        while len(surrounding_values) < 3 and step < max_step:
+            surrounding_values = displ[max(0, y - step):min(height, y + 1 + step), max(0, x - step):min(width, x + 1 + step)]
+            surrounding_values = surrounding_values.flatten()
+            surrounding_values = surrounding_values[(surrounding_values > min_disparity) & (surrounding_values < max_disparity)]
+            step += 1
 
+        # 如果仍然没有找到有效视差，则返回 None 或默认值
+        if len(surrounding_values) == 0:
+            return np.array([np.nan, np.nan, np.nan])  # 或者 return None
+        disp = np.min(surrounding_values)
+
+        # 齐次坐标变换
+        xyd1 = np.array([x , y , disp, 1]).reshape(4, 1)
+        XYZW = np.dot(self.Q_matrix, xyd1)
+
+        # 归一化得到 3D 坐标
+        points_3d = (XYZW[:3] / XYZW[3]).flatten()
+
+        return points_3d
     def disparity_to_depth(self, disp, focal_length, baseline):
         """ 视差图转换为深度图 """
         depth = (focal_length * baseline) / disp
@@ -291,7 +345,7 @@ class Stereo:
             print(rectifyed_left.shape, depth_colormap.shape)
             combined_image = np.hstack((rectifyed_left, depth_colormap))
             cv2.imshow("Estimated disparity222", combined_image)
-            cv2.setMouseCallback("Estimated disparity222", self.on_mouse, 0)
+            cv2.setMouseCallback("Estimated disparity222", self.on_mouse, (disp1))
             if cv2.waitKey(0) & 0xFF == ord('q'):
                 break
             show_ply = True
