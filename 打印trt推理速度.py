@@ -171,4 +171,4 @@ trt_infer_time_instance = trt_infer_time(engine_file_path=r'stereomodel\IGEV\wei
 trt_infer_time_instance.measure_speed()
 # measure_speed(engine_file=r"D:\BaiduSyncdisk\work\RTMpose-26-port\rtmpose-mobilev4\combined_model2.engine")
 # measure_speed(engine_file='./weights/end2end.engine')
-# measure_speed(engine_file='./weights/new_pose.engine')
+# measure_speed(engine_file='./weights/new_p
