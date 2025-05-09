@@ -205,6 +205,7 @@ class stereoRectify:
             self.image_size,  # 图像尺寸
             # criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)  # 精度和最大迭代次数
         )
+        
         left_reprojection_error, left_error_list = self.compute_reprojection_error(obj_points, left_img_points, rvecs_left, tvecs_left, K_left, dist_left)
         right_reprojection_error, right_error_list = self.compute_reprojection_error(obj_points, right_img_points, rvecs_right, tvecs_right, K_right, dist_right)
         print("Left Reprojection Error: \n", left_reprojection_error)
@@ -444,31 +445,33 @@ if __name__ == "__main__":
         left_video_path = r"../calibration/data/20250306134745\step2-1/a0.avi"
         right_video_path = r"../calibration/data/20250306134745\step2-1/a1.avi"
         
-        left_video_path = r"../calibration\data\20250305144726\step2-5/a0.avi"
-        right_video_path = r"../calibration\data\20250305144726\step2-5/a1.avi"
+        left_video_path = r"../calibration\data\20250425180553/a0.avi"
+        right_video_path = r"../calibration\data\20250425180553/a1.avi"
         
-        # left_video_path = r"../calibration/data/20250418115338\step2/a0.avi"
-        # right_video_path = r"../calibration/data/20250418115338\step2/a1.avi"
+        # left_video_path = r"../calibration/data/4_27/20250427161503/a0.avi"
+        # right_video_path = r"../calibration/data/4_27/20250427161503/a1.avi"
         
         cap_left = cv2.VideoCapture(left_video_path)
         cap_right = cv2.VideoCapture(right_video_path)
         
         
         # 保存为ffv1视频
-        fourcc = cv2.VideoWriter_fourcc(*'FFV1')
-        out = cv2.VideoWriter('rectified_video_ai_wlp.avi', fourcc, 30.0, (1056, 784 * 2))
+        # fourcc = cv2.VideoWriter_fourcc(*'FFV1')
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        video_file_name = left_video_path.split('/')[-2].split('.')[0]
+        out = cv2.VideoWriter(f'data/{video_file_name}_mjpg.avi', fourcc, 30.0, (1056, 784 * 2))
         while True:
             ret_left, frame_left = cap_left.read()
             ret_right, frame_right = cap_right.read()
-            frame_left = cv2.flip(frame_left, 1)
-            frame_right = cv2.flip(frame_right, 1)
+            # frame_left = cv2.flip(frame_left, 1)
+            # frame_right = cv2.flip(frame_right, 1)
             if not ret_left or not ret_right:
                 break
             map1x, map1y, map2x, map2y, _ = stereo_rectify.stereo_rectify_with_distortion(k_left, dist_left, k_right, dist_right, R, T, stereo_rectify.image_size)
             # map1x, map1y, map2x, map2y, _ = stereo_rectify.stereo_rectify_without_distortion(k_left, k_right, R, T, stereo_rectify.image_size)
             # 畸变矫正
-            frame_left = cv2.undistort(frame_left, k_left, dist_left)
-            frame_right = cv2.undistort(frame_right, k_right, dist_right)
+            # frame_left = cv2.undistort(frame_left, k_left, dist_left)
+            # frame_right = cv2.undistort(frame_right, k_right, dist_right)
             rectified_left, rectified_right = stereo_rectify.apply_rectification(frame_left, frame_right, map1x, map1y, map2x, map2y)
             combined_img = np.vstack((rectified_left, rectified_right))
             print(frame_left.shape, frame_right.shape)
@@ -479,12 +482,13 @@ if __name__ == "__main__":
             # 使用sgbm得到视差图
             # print(rectified_left.shape, rectified_right.shape)
             # gray_left = cv2.cvtColor(rectified_left, cv2.COLOR_BGR2GRAY)
-            # gray_right = cv2.cvtColor(rectified_right, cv2.COLOR_BGR2GRAY)
+            # gray_right = cv2.cvtColor(rectified_rig
+            # ht, cv2.COLOR_BGR2GRAY)
             # 左右图划多个线线判断是否对齐
             for i in range(10):
                 cv2.line(rectified_left, (0, 100 + i * 50), (1056, 100 + i * 50), (0, 0, 255), 1)
                 cv2.line(rectified_right, (0, 100 + i * 50), (1056, 100 + i * 50), (0, 0, 255), 1)
             combined_img = np.hstack((rectified_left, rectified_right))
             cv2.imshow('Rectified Right', combined_img)
-            cv2.waitKey(0)
+            cv2.waitKey(1)
         out.release()
